@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Log Parser</title>
+</head>
+<body>
+
+<!-- Full-page background image -->
+<div class="bg-wallpaper"></div>
+
+<header>
+  <span class="title">SQL Log Parser</span>
+  <span class="subtitle">By Maximo Systems Team</span>
+</header>
+
+<div class="main">
+
+  <!-- Input card -->
+  <div class="card">
+    <h2>Input</h2>
+
+    <div class="tabs">
+      <div class="tab active"  onclick="switchTab('file')">📂 Load from File</div>
+      <div class="tab"         onclick="switchTab('merge')">🗂 Merge Files</div>
+      <div class="tab"         onclick="switchTab('ibm')">🌐 Load From Ecurep IBM Editor</div>
+      <div class="tab"         onclick="switchTab('paste')">📋 Paste Manually</div>
+    </div>
+
+    <!-- File tab -->
+    <div class="tab-content active" id="tab-file">
+      <div class="file-drop" id="fileDrop" onclick="doLoadFile()">
+        <div class="icon">📂</div>
+        <div>Click to select a <strong>.log</strong> or <strong>.txt</strong> file</div>
+        <div class="hint">Native OS dialog — supports any path</div>
+      </div>
+      <div class="preview-box" id="filePreview"></div>
+    </div>
+
+    <!-- Merge tab -->
+    <div class="tab-content" id="tab-merge">
+      <div class="file-drop" onclick="doMergeFiles()">
+        <div class="icon">🗂</div>
+        <div>Click to select <strong>multiple files</strong> to merge</div>
+        <div class="hint">Hold Ctrl or Shift to select multiple files at once</div>
+      </div>
+      <div class="preview-box" id="mergePreview"></div>
+    </div>
+
+    <!-- IBM Editor tab -->
+    <div class="tab-content" id="tab-ibm">
+      <div class="ibm-form">
+        <div>
+          <label>IBM Editor URL</label>
+          <input type="text" id="ibmURL" placeholder="https://editor.apps.cloud.itc.ibm.com/sse/edit/edit.html#/sse/bigfile/...">
+        </div>
+        <div>
+          <label>Cookie (from browser DevTools)</label>
+          <input type="password" id="ibmCookie" placeholder="Paste your browser Cookie header value here">
+        </div>
+        <div class="ibm-progress" id="ibmProgress">
+          <div class="bar"><div class="fill" id="ibmFill"></div></div>
+          <div class="msg" id="ibmMsg">Connecting...</div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn-ibm" onclick="doLoadIBM()" id="btnIBMLoad">🌐 Load Log File</button>
+        <button class="btn-secondary" id="btnDownloadLog" onclick="doDownloadLog()">⬇ Download Log</button>
+      </div>
+    </div>
+
+    <!-- Paste tab -->
+    <div class="tab-content" id="tab-paste">
+      <textarea id="pasteArea" placeholder="Paste log lines here...&#10;&#10;Example:&#10;14 May 2025 10:58:11:246 [WARN] [MXServer] [] BMXAA6720W - USER = (M13231) SPID = (10.131.53.118) app (null) object (ASSET) : select * from asset where siteid = 'BEDFORD' (execution took 6200 milliseconds)"></textarea>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="btn-row">
+      <button class="btn-primary"   onclick="generateHTML()"  id="btnGenerate">⚙ Generate HTML</button>
+      <button class="btn-success"   onclick="doSaveHTML()"    id="btnSave"     disabled>💾 Save As...</button>
+      <button class="btn-secondary" onclick="doOpenBrowser()" id="btnOpenNew"  disabled>↗ Open in Browser</button>
+      <button class="btn-danger"    onclick="clearAll()">✕ Clear</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- Results card -->
+  <div class="card" id="resultSection">
+    <div class="result-header">
+      <h2>Results</h2>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="resultTable">
+        <thead id="resultHead"></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

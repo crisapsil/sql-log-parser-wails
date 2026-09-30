@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Log Parser</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f0f0; min-height: 100vh; display: flex; flex-direction: column; }
+
+  header { background: #282828; padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
+  header .title  { color: #fff;    font-size: 20px; font-weight: bold; }
+  header .subtitle { color: #CC5500; font-size: 16px; font-weight: bold; }
+
+  .main { flex: 1; padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; }
+
+  .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .card h2 { font-size: 15px; margin-bottom: 12px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab  { padding: 8px 18px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: #f7f7f7; font-size: 13px; color: #444; user-select: none; }
+  .tab.active { background: #282828; color: #fff; border-color: #282828; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* File drop */
+  .file-drop { border: 2px dashed #ccc; border-radius: 6px; padding: 32px; text-align: center; cursor: pointer; color: #888; font-size: 14px; transition: border-color .2s, background .2s; }
+  .file-drop:hover { border-color: #CC5500; background: #fff8f4; color: #CC5500; }
+  .file-drop .icon { font-size: 36px; margin-bottom: 8px; }
+  .file-drop .hint { font-size: 12px; margin-top: 6px; color: #aaa; }
+
+  /* Textarea */
+  textarea { width: 100%; height: 180px; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-family: monospace; font-size: 12px; resize: vertical; outline: none; }
+  textarea:focus { border-color: #CC5500; }
+
+  /* IBM form */
+  .ibm-form { display: flex; flex-direction: column; gap: 10px; }
+  .ibm-form label { font-size: 12px; color: #555; font-weight: bold; }
+  .ibm-form input[type=text], .ibm-form input[type=password] {
+    width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; outline: none; font-family: monospace;
+  }
+  .ibm-form input:focus { border-color: #CC5500; }
+  .ibm-progress { display: none; margin-top: 8px; }
+  .ibm-progress .bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .ibm-progress .fill { height: 100%; background: #CC5500; width: 0%; transition: width .3s; border-radius: 3px; }
+  .ibm-progress .msg { font-size: 12px; color: #555; margin-top: 4px; }
+
+  /* Preview */
+  .preview-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px; font-family: monospace; font-size: 11px; max-height: 160px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #222; margin-top: 10px; display: none; }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  button { padding: 9px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; }
+  .btn-primary   { background: #CC5500; color: #fff; }
+  .btn-primary:hover  { background: #aa4400; }
+  .btn-primary:disabled  { background: #ccc; cursor: not-allowed; }
+  .btn-secondary { background: #282828; color: #fff; }
+  .btn-secondary:hover { background: #444; }
+  .btn-secondary:disabled { background: #ccc; cursor: not-allowed; }
+  .btn-success   { background: #2a7a2a; color: #fff; }
+  .btn-success:hover   { background: #1e5c1e; }
+  .btn-success:disabled { background: #ccc; cursor: not-allowed; }
+  .btn-danger    { background: #fff; color: #c00; border: 1px solid #c00; }
+  .btn-danger:hover    { background: #fff0f0; }
+  .btn-ibm       { background: #0062ff; color: #fff; }
+  .btn-ibm:hover       { background: #0050d0; }
+  .btn-ibm:disabled    { background: #ccc; cursor: not-allowed; }
+
+  /* Status */
+  .status { margin-top: 10px; font-size: 13px; min-height: 20px; color: #555; }
+  .status.error   { color: #c00; }
+  .status.success { color: #2a7a2a; font-weight: bold; }
+  .status.warn    { color: #a06000; }
+
+  /* Results */
+  #resultSection { display: none; }
+  .result-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .result-header h2 { border: none; margin: 0; padding: 0; }
+  .stats { font-size: 12px; color: #666; display: flex; gap: 16px; flex-wrap: wrap; }
+  .stats span { background: #f0f0f0; padding: 3px 10px; border-radius: 10px; }
+  .stats .slow-stat { background: #fdecea; color: #c00; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border: 1px solid #ddd; padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f2f2f2; cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { background: #e8e8e8; }
+  th.sorted-asc::after  { content: ' ▲'; font-size: 10px; }
+  th.sorted-desc::after { content: ' ▼'; font-size: 10px; }
+  pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 12px; }
+  .slow { color: #b00020; font-weight: bold; }
+  tr:hover td { background: #fafafa; }
+
+  /* Download log button */
+  #btnDownloadLog { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">SQL Log Parser</span>
+  <span class="subtitle">By Maximo Systems Team</span>
+</header>
+
+<div class="main">
+
+  <!-- Input card -->
+  <div class="card">
+    <h2>Input</h2>
+
+    <div class="tabs">
+      <div class="tab active"  onclick="switchTab('file')">📂 Load from File</div>
+      <div class="tab"         onclick="switchTab('ibm')">🌐 Load from Ecurep IBM Editor</div>
+      <div class="tab"         onclick="switchTab('paste')">📋 Paste Manually</div>
+      <div class="tab"         onclick="switchTab('merge')">🗂 Merge Files</div>
+
+    </div>
+
+    <!-- File tab -->
+    <div class="tab-content active" id="tab-file">
+      <div class="file-drop" onclick="doLoadFile()">
+        <div class="icon">📂</div>
+        <div>Click to select a <strong>.log</strong> or <strong>.txt</strong> file</div>
+        <div class="hint">Native OS dialog — supports any path</div>
+      </div>
+      <div class="preview-box" id="filePreview"></div>
+    </div>
+
+    <!-- Merge tab -->
+    <div class="tab-content" id="tab-merge">
+      <div class="file-drop" onclick="doMergeFiles()">
+        <div class="icon">🗂</div>
+        <div>Click to select <strong>multiple files</strong> to merge</div>
+        <div class="hint">Hold Ctrl or Shift to select multiple files at once</div>
+      </div>
+      <div class="preview-box" id="mergePreview"></div>
+    </div>
+
+    <!-- IBM Editor tab -->
+    <div class="tab-content" id="tab-ibm">
+      <div class="ibm-form">
+        <div>
+          <label>IBM Editor URL</label>
+          <input type="text" id="ibmURL" placeholder="https://editor.apps.cloud.itc.ibm.com/sse/edit/edit.html#/sse/bigfile/...">
+        </div>
+        <div>
+          <label>Cookie (from browser DevTools)</label>
+          <input type="password" id="ibmCookie" placeholder="Paste your browser Cookie header value here">
+        </div>
+        <div class="ibm-progress" id="ibmProgress">
+          <div class="bar"><div class="fill" id="ibmFill"></div></div>
+          <div class="msg" id="ibmMsg">Connecting...</div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn-ibm" onclick="doLoadIBM()" id="btnIBMLoad">🌐 Load from IBM</button>
+        <button class="btn-secondary" id="btnDownloadLog" onclick="doDownloadLog()">⬇ Download Log</button>
+      </div>
+    </div>
+
+    <!-- Paste tab -->
+    <div class="tab-content" id="tab-paste">
+      <textarea id="pasteArea" placeholder="Paste log lines here...&#10;&#10;Example:&#10;14 May 2025 10:58:11:246 [WARN] [MXServer] [] BMXAA6720W - USER = (M13231) SPID = (10.131.53.118) app (null) object (ASSET) : select * from asset where siteid = 'BEDFORD' (execution took 6200 milliseconds)"></textarea>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="btn-row">
+      <button class="btn-primary"   onclick="generateHTML()" id="btnGenerate">⚙ Generate HTML</button>
+      <button class="btn-success"   onclick="doSaveHTML()"   id="btnSave"    disabled>💾 Save As...</button>
+      <button class="btn-secondary" onclick="doOpenNew()"    id="btnOpenNew" disabled>↗ Open in New Tab</button>
+      <button class="btn-danger"    onclick="clearAll()">✕ Clear</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- Results card -->
+  <div class="card" id="resultSection">
+    <div class="result-header">
+      <h2>Results</h2>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="resultTable">
+        <thead id="resultHead"></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { ParseFile, MergeFiles, ParseText, BuildHTML, SaveHTML, LoadFromIBM, SaveRawLog } from './wailsjs/go/main/App.js';
+  import { EventsOn } from './wailsjs/runtime/runtime.js';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let activeTab     = 'file';
+  let loadedRows    = '';
+  let loadedCount   = 0;
+  let isMerge       = false;
+  let generatedHTML = '';
+  let ibmRawContent = '';
+  let ibmLogName    = 'maximo.log';
+  let sortDir       = [];
+
+  // ── IBM progress events ────────────────────────────────────────────────────
+  EventsOn('ibm:progress', data => {
+    document.getElementById('ibmFill').style.width = data.pct + '%';
+    document.getElementById('ibmMsg').textContent  = data.message;
+  });
+
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  window.switchTab = function(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const ids = ['file','merge','ibm','paste'];
+      t.classList.toggle('active', ids[i] === tab);
+    });
+    ['file','merge','ibm','paste'].forEach(id => {
+      document.getElementById('tab-' + id).classList.toggle('active', id === tab);
+    });
+  };
+
+  // ── Load single file ───────────────────────────────────────────────────────
+  window.doLoadFile = async function() {
+    setStatus('Opening file dialog...', '');
+    const result = await ParseFile();
+    if (!result || result.error) {
+      setStatus(result?.error ? '⚠ ' + result.error : 'Cancelled.', result?.error ? 'error' : '');
+      return;
+    }
+    if (result.count === 0) { setStatus('⚠ No SQL queries found.', 'warn'); return; }
+    loadedRows  = result.rows;
+    loadedCount = result.count;
+    isMerge     = false;
+    showPreview('filePreview', result.count + ' queries found.');
+    setStatus('✔ ' + result.count.toLocaleString() + ' queries found. Click Generate HTML.', 'success');
+  };
+
+  // ── Merge files ────────────────────────────────────────────────────────────
+  window.doMergeFiles = async function() {
+    setStatus('Opening multi-select dialog...', '');
+    const result = await MergeFiles();
+    if (!result || result.error) {
+      setStatus(result?.error ? '⚠ ' + result.error : 'Cancelled.', result?.error ? 'error' : '');
+      return;
+    }
+    if (result.count === 0) { setStatus('⚠ No SQL queries found in selected files.', 'warn'); return; }
+    loadedRows  = result.rows;
+    loadedCount = result.count;
+    isMerge     = true;
+    showPreview('mergePreview', result.count + ' queries found across merged files.');
+    setStatus('✔ Merged — ' + result.count.toLocaleString() + ' queries found. Click Generate HTML.', 'success');
+  };
+
+  // ── IBM Editor ─────────────────────────────────────────────────────────────
+  window.doLoadIBM = async function() {
+    const ibmURL    = document.getElementById('ibmURL').value.trim();
+    const ibmCookie = document.getElementById('ibmCookie').value.trim();
+    if (!ibmURL || !ibmCookie) { setStatus('⚠ URL and Cookie are required.', 'error'); return; }
+
+    // extract log name from URL for later download
+    const hashPart = ibmURL.split('#')[1] || '';
+    const segs = hashPart.split('/').filter(Boolean);
+    ibmLogName = segs.length ? segs[segs.length - 1] : 'maximo.log';
+
+    document.getElementById('ibmProgress').style.display = 'block';
+    document.getElementById('ibmFill').style.width = '0%';
+    document.getElementById('ibmMsg').textContent  = 'Connecting...';
+    document.getElementById('btnIBMLoad').disabled = true;
+    setStatus('Connecting to IBM Editor...', '');
+
+    const result = await LoadFromIBM(ibmURL, ibmCookie);
+    document.getElementById('btnIBMLoad').disabled = false;
+
+    if (!result || result.error) {
+      document.getElementById('ibmProgress').style.display = 'none';
+      setStatus('⚠ ' + (result?.error || 'Unknown error'), 'error');
+      return;
+    }
+    if (result.count === 0) {
+      document.getElementById('ibmProgress').style.display = 'none';
+      setStatus('⚠ No SQL queries found.', 'warn');
+      return;
+    }
+
+    loadedRows    = result.rows;
+    loadedCount   = result.count;
+    isMerge       = false;
+    ibmRawContent = ''; // raw content not returned separately — download via SaveRawLog not available in this path
+    document.getElementById('btnDownloadLog').style.display = 'inline-block';
+    document.getElementById('ibmFill').style.width = '100%';
+    document.getElementById('ibmMsg').textContent  = 'Done!';
+    setStatus('✔ IBM Editor: ' + result.count.toLocaleString() + ' queries found. Click Generate HTML.', 'success');
+  };
+
+  window.doDownloadLog = async function() {
+    if (!ibmRawContent) { setStatus('⚠ No raw log content available.', 'warn'); return; }
+    const path = await SaveRawLog(ibmRawContent, ibmLogName);
+    if (path && !path.startsWith('error:')) setStatus('✔ Log saved: ' + path, 'success');
+    else if (path.startsWith('error:')) setStatus('⚠ ' + path, 'error');
+  };
+
+  // ── Generate HTML ──────────────────────────────────────────────────────────
+  window.generateHTML = async function() {
+    let rows = loadedRows;
+    let count = loadedCount;
+    let merge = isMerge;
+
+    // paste tab — parse on the fly in Go
+    if (activeTab === 'paste') {
+      const text = document.getElementById('pasteArea').value;
+      if (!text.trim()) { setStatus('⚠ Paste log content first.', 'error'); return; }
+      setStatus('Parsing...', '');
+      const result = await ParseText(text);
+      if (!result || result.count === 0) { setStatus('⚠ No SQL queries found.', 'warn'); return; }
+      rows  = result.rows;
+      count = result.count;
+      merge = false;
+    }
+
+    if (!rows || count === 0) { setStatus('⚠ Load or paste log content first.', 'error'); return; }
+
+    // compute stats from rows HTML
+    let totalTime = 0, slowCount = 0, maxTime = 0;
+    const tdRe = /<td[^>]*>(\d+)<\/td>/g;
+    let m;
+    while ((m = tdRe.exec(rows)) !== null) {
+      const t = parseInt(m[1], 10);
+      totalTime += t;
+      if (t >= 5000) slowCount++;
+      if (t > maxTime) maxTime = t;
+    }
+    const avgTime = count > 0 ? Math.round(totalTime / count) : 0;
+
+    setStatus('Building HTML...', '');
+    generatedHTML = await BuildHTML(rows, count, slowCount, avgTime, maxTime, merge);
+
+    // render preview table
+    renderTable(rows, merge);
+
+    const avgFmt = avgTime.toLocaleString();
+    document.getElementById('stats').innerHTML =
+      '<span>Total: <b>' + count.toLocaleString() + '</b></span>' +
+      '<span class="' + (slowCount > 0 ? 'slow-stat' : '') + '">Slow (>=5s): <b>' + slowCount.toLocaleString() + '</b></span>' +
+      '<span>Avg: <b>' + avgFmt + ' ms</b></span>' +
+      '<span>Max: <b>' + maxTime.toLocaleString() + ' ms</b></span>';
+
+    document.getElementById('resultSection').style.display = 'block';
+    document.getElementById('btnSave').disabled    = false;
+    document.getElementById('btnOpenNew').disabled = false;
+    setStatus('✔ ' + count.toLocaleString() + ' queries. Use Save As to export.', 'success');
+    document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // ── Render preview table ───────────────────────────────────────────────────
+  function renderTable(rows, merge) {
+    // header
+    const thead = document.getElementById('resultHead');
+    if (merge) {
+      thead.innerHTML = '<tr><th onclick="sortCol(0)" style="width:100px">Time (ms)</th><th onclick="sortCol(1)">File</th><th onclick="sortCol(2)">SQL</th></tr>';
+      sortDir = [false, false, false];
+    } else {
+      thead.innerHTML = '<tr><th onclick="sortCol(0)" style="width:110px">Time (ms)</th><th onclick="sortCol(1)">SQL</th></tr>';
+      sortDir = [false, false];
+    }
+
+    // parse rows HTML into DOM
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = rows;
+    const tbody = document.getElementById('resultBody');
+    tbody.innerHTML = '';
+    tbody.appendChild(tmp);
+  }
+
+  // ── Sort ───────────────────────────────────────────────────────────────────
+  window.sortCol = function(col) {
+    const tbody = document.getElementById('resultBody');
+    const rowsArr = Array.from(tbody.querySelectorAll('tr'));
+    const dir = sortDir[col];
+    rowsArr.sort((a, b) => {
+      if (col === 0) {
+        return dir
+          ? (parseInt(a.cells[0].textContent)||0) - (parseInt(b.cells[0].textContent)||0)
+          : (parseInt(b.cells[0].textContent)||0) - (parseInt(a.cells[0].textContent)||0);
+      }
+      return dir
+        ? a.cells[col].textContent.localeCompare(b.cells[col].textContent)
+        : b.cells[col].textContent.localeCompare(a.cells[col].textContent);
+    });
+    sortDir[col] = !dir;
+    rowsArr.forEach(r => tbody.appendChild(r));
+    document.querySelectorAll('#resultTable th').forEach((th, i) => {
+      th.classList.remove('sorted-asc', 'sorted-desc');
+      if (i === col) th.classList.add(sortDir[col] ? 'sorted-desc' : 'sorted-asc');
+    });
+  };
+
+  // ── Save HTML ──────────────────────────────────────────────────────────────
+  window.doSaveHTML = async function() {
+    if (!generatedHTML) return;
+    const path = await SaveHTML(generatedHTML, 'queries.html');
+    if (path && !path.startsWith('error:')) setStatus('✔ Saved: ' + path, 'success');
+    else if (path && path.startsWith('error:')) setStatus('⚠ ' + path, 'error');
+  };
+
+  // ── Open in new tab ────────────────────────────────────────────────────────
+  window.doOpenNew = function() {
+    if (!generatedHTML) return;
+    const blob = new Blob([generatedHTML], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  };
+
+  // ── Clear ──────────────────────────────────────────────────────────────────
+  window.clearAll = function() {
+    loadedRows = ''; loadedCount = 0; isMerge = false;
+    generatedHTML = ''; ibmRawContent = '';
+    document.getElementById('filePreview').style.display  = 'none';
+    document.getElementById('mergePreview').style.display = 'none';
+    document.getElementById('pasteArea').value = '';
+    document.getElementById('ibmURL').value    = '';
+    document.getElementById('ibmProgress').style.display  = 'none';
+    document.getElementById('btnDownloadLog').style.display = 'none';
+    document.getElementById('resultSection').style.display = 'none';
+    document.getElementById('resultBody').innerHTML = '';
+    document.getElementById('btnSave').disabled    = true;
+    document.getElementById('btnOpenNew').disabled = true;
+    setStatus('Cleared.', '');
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function showPreview(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className   = 'status' + (type ? ' ' + type : '');
+  }
+</script>
+</body>
+</html>
