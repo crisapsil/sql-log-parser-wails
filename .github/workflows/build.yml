@@ -37,7 +37,8 @@ jobs:
 
       - name: Ad-hoc sign (free — no Apple Developer account needed)
         run: |
-          APP=$(ls build/bin/*.app | head -1)
+          # .app is a directory — use -d to find directories only
+          APP=$(find build/bin -maxdepth 1 -name "*.app" -type d | head -1)
           echo "Signing: $APP"
           codesign --deep --force --sign "-" "$APP"
           echo "Signed with ad-hoc identity"
@@ -45,7 +46,8 @@ jobs:
       - name: Package as zip
         run: |
           cd build/bin
-          APP=$(ls *.app | head -1)
+          APP=$(find . -maxdepth 1 -name "*.app" -type d | head -1 | sed 's|./||')
+          echo "Packaging: $APP"
           zip -r sql-log-parser-macos.zip "$APP"
           echo "Packaged: $(du -sh sql-log-parser-macos.zip)"
 
@@ -78,6 +80,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev gcc pkg-config
           sudo apt-get install -y libwebkit2gtk-4.1-dev
+          # Create compat symlink so Wails finds webkit2gtk-4.0 pkg-config
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc \
+                      /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
