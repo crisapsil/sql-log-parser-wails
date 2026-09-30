@@ -1,0 +1,96 @@
+name: Build macOS and Linux
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+
+  # ── macOS ──────────────────────────────────────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        run: wails build -platform darwin/amd64 -o sql-log-parser
+        working-directory: .
+
+      - name: Ad-hoc sign (free — no Apple Developer account needed)
+        run: |
+          codesign --deep --force --sign "-" build/bin/sql-log-parser.app
+          echo "Signed with ad-hoc identity"
+
+      - name: Package as zip
+        run: |
+          cd build/bin
+          zip -r sql-log-parser-macos.zip sql-log-parser.app
+          echo "Packaged: $(du -sh sql-log-parser-macos.zip)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sql-log-parser-macos
+          path: build/bin/sql-log-parser-macos.zip
+          retention-days: 30
+
+  # ── Linux ──────────────────────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            gcc \
+            pkg-config
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        run: wails build -platform linux/amd64 -o sql-log-parser
+
+      - name: Package as tar.gz
+        run: |
+          cd build/bin
+          tar -czf sql-log-parser-linux.tar.gz sql-log-parser
+          echo "Packaged: $(du -sh sql-log-parser-linux.tar.gz)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sql-log-parser-linux
+          path: build/bin/sql-log-parser-linux.tar.gz
+          retention-days: 30
