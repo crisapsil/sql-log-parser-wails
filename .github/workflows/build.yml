@@ -29,18 +29,24 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Build
-        run: wails build -platform darwin/amd64 -o sql-log-parser
+        run: wails build -platform darwin/amd64
         working-directory: .
+
+      - name: List build output
+        run: ls -la build/bin/
 
       - name: Ad-hoc sign (free — no Apple Developer account needed)
         run: |
-          codesign --deep --force --sign "-" build/bin/sql-log-parser.app
+          APP=$(ls build/bin/*.app | head -1)
+          echo "Signing: $APP"
+          codesign --deep --force --sign "-" "$APP"
           echo "Signed with ad-hoc identity"
 
       - name: Package as zip
         run: |
           cd build/bin
-          zip -r sql-log-parser-macos.zip sql-log-parser.app
+          APP=$(ls *.app | head -1)
+          zip -r sql-log-parser-macos.zip "$APP"
           echo "Packaged: $(du -sh sql-log-parser-macos.zip)"
 
       - name: Upload artifact
